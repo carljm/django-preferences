@@ -1,11 +1,10 @@
-from unittest import TestCase
-
 from django import template
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.template import RequestContext, Template
+from django.test import TestCase
 from django.test.client import RequestFactory
 
 from preferences import context_processors, preferences
@@ -30,13 +29,11 @@ preferences object available'
         )
 
         # With multiple preferences display listing view.
-        MyPreferences.objects.create()
+        MyPreferences.singleton.create()
         response = admin_obj.changelist_view(request)
         self.failUnless('changelist-form' in response.content, 'Should \
 display listing if multiple preferences objects are available.')
 
-    def tearDown(self):
-        MyPreferences.objects.all().delete()
 
 
 class ContextProcessorsTestCase(TestCase):
@@ -67,8 +64,6 @@ preferences.MyPreferences }}{% endif %}")
         self.failUnless(t.render(context_instance), "MyPreferences should be \
 available as part of preferences var in template context.")
 
-    def tearDown(self):
-        MyPreferences.objects.all().delete()
 
 
 class ModelsTestCase(TestCase):
@@ -84,88 +79,11 @@ class ModelsTestCase(TestCase):
         # Should have MyPreferences member without
         # sites since we are not using sites.
         my_preferences = preferences.MyPreferences
-        self.failIf(my_preferences.sites.all(), "Without SITE_ID should not \
-have any preferences with sites.")
 
-        # Should have MyPreferences member for current site.
-        settings.SITE_ID = 1
-        current_site = Site.objects.get_current()
-        my_preferences = preferences.MyPreferences
-        self.failUnlessEqual(current_site, my_preferences.sites.get(), "With \
-SITE_ID should have preferences for current site.")
-
-        # Should have MyPreferences member for current site.
-        settings.SITE_ID = 2
-        second_site, created = Site.objects.get_or_create(id=2)
-        my_preferences = preferences.MyPreferences
-        self.failUnlessEqual(second_site, my_preferences.sites.get(), "With \
-SITE_ID should have preferences for current site.")
-
-    def test_site_cleanup(self):
-        """
-        There should only ever be a single preferences object per site. Thus on
-        many to many changes pre-existing preferences should be cleared of
-        sites already associated with current preferences object.
-        """
-        # When creating new preferences for a site, said site should be
-        # removed from existing preference sites.
-        site1 = Site.objects.create()
-        site2 = Site.objects.create()
-
-        # Add preferences for site 1.
-        site1_preferences = MyPreferences.objects.create()
-        site1_preferences.sites.add(site1)
-        self.failUnlessEqual(site1_preferences.sites.get(), site1)
-
-        # Now if we add another preferences object for site1, original site1
-        # preferences should no longer be associated with site1.
-        more_site1_preferences = MyPreferences.objects.create()
-        more_site1_preferences.sites.add(site1)
-        self.failIf(site1 in site1_preferences.sites.all())
-
-        # If we add more sites to a preference,
-        # it should be associated with them all.
-        more_site1_preferences.sites.add(site2)
-        self.failIf(site1 not in more_site1_preferences.sites.all() or site2 \
-                not in more_site1_preferences.sites.all())
-        some_more_preferences = MyPreferences.objects.create()
-        some_more_preferences.sites.add(site1)
-        some_more_preferences.sites.add(site2)
-        self.failIf(site1 in more_site1_preferences.sites.all() or site2 in \
-                more_site1_preferences.sites.all())
-        # Double check that we now only have a single
-        # preferences object associated with both sites.
-        self.failUnlessEqual(MyPreferences.objects.filter(sites__in=[site1, \
-                site2]).distinct().get(), some_more_preferences)
-
-    def tearDown(self):
-        MyPreferences.objects.all().delete()
-        settings.SITE_ID = None
 
 
 class SingeltonManagerTestCase(TestCase):
     def test_get_query_set(self):
-        # Should return preferences without sites.
+        # Should return preferences.
         # Shouldn't fail on duplicates.
-        self.failIf(MyPreferences.singleton.get().sites.all(), "Without \
-                SITE_ID should not have any preferences with sites.")
-
-        # Should return preferences for current site.
-        # Shouldn't fail on duplicates.
-        settings.SITE_ID = 1
-        current_site = Site.objects.get_current()
-        obj = MyPreferences.singleton.get()
-        self.failUnlessEqual(current_site, obj.sites.get(), "With SITE_ID \
-                should have preferences for current site.")
-
-        # Should return preferences for current site.
-        # Shouldn't fail on duplicates.
-        settings.SITE_ID = 2
-        second_site, created = Site.objects.get_or_create(id=2)
-        obj = MyPreferences.singleton.get()
-        self.failUnlessEqual(second_site, obj.sites.get(), "With SITE_ID \
-                should have preferences for current site.")
-
-    def tearDown(self):
-        MyPreferences.objects.all().delete()
-        settings.SITE_ID = None
+        MyPreferences.singleton.get()

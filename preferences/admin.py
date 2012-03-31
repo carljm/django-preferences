@@ -16,7 +16,7 @@ class PreferencesAdmin(admin.ModelAdmin):
         otherwise display listing.
         """
         model = self.model
-        if model.objects.all().count() > 1:
+        if model._default_manager.all().count() > 1:
             return super(PreferencesAdmin, self).changelist_view(request)
         else:
             obj = model.singleton.get()
